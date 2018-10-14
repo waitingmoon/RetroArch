@@ -39,6 +39,10 @@
 #include "cheevos/cheevos.h"
 #endif
 
+#ifdef HAVE_OPENGL
+#include "gfx/common/gl_common.h"
+#endif
+
 #ifdef HAVE_NETWORKING
 #include "network/netplay/netplay.h"
 #endif
@@ -955,16 +959,10 @@ static bool dynamic_request_hw_context(enum retro_hw_context_type type,
          break;
 
       case RETRO_HW_CONTEXT_OPENGL_CORE:
-         {
-            gfx_ctx_flags_t flags;
-            flags.flags = 0;
-            BIT32_SET(flags.flags, GFX_CTX_FLAGS_GL_CORE_CONTEXT);
-
-            video_context_driver_set_flags(&flags);
-
-            RARCH_LOG("Requesting core OpenGL context (%u.%u).\n",
-                  major, minor);
-         }
+         /* TODO/FIXME - we should do a check here to see if
+          * the requested core GL version is supported */
+         RARCH_LOG("Requesting core OpenGL context (%u.%u).\n",
+               major, minor);
          break;
 #endif
 
@@ -1373,6 +1371,10 @@ bool rarch_environment_cb(unsigned cmd, void *data)
 
          if (!dynamic_verify_hw_context(cb->context_type, cb->version_minor, cb->version_major))
             return false;
+
+#if defined(HAVE_OPENGL)
+         if (!gl_set_core_context(cb->context_type)) { }
+#endif
 
          cb->get_current_framebuffer = video_driver_get_current_framebuffer;
          cb->get_proc_address        = video_driver_get_proc_address;

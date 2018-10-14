@@ -1501,6 +1501,8 @@ static bool gl_init_pbo_readback(gl_t *gl)
 static const gfx_ctx_driver_t *gl_get_context(gl_t *gl)
 {
    enum gfx_ctx_api api;
+   const gfx_ctx_driver_t *gfx_ctx      = NULL;
+   void                      *ctx_data  = NULL;
    const char                 *api_name = NULL;
    settings_t                 *settings = config_get_ptr();
    struct retro_hw_render_callback *hwr = video_driver_get_hw_context();
@@ -1533,9 +1535,14 @@ static const gfx_ctx_driver_t *gl_get_context(gl_t *gl)
          && (hwr->context_type != RETRO_HW_CONTEXT_NONE))
       gl_shared_context_use = true;
 
-   return video_context_driver_init_first(gl,
+   gfx_ctx = video_context_driver_init_first(gl,
          settings->arrays.video_context_driver,
-         api, major, minor, gl_shared_context_use);
+         api, major, minor, gl_shared_context_use, &ctx_data);
+
+   if (ctx_data)
+      gl->ctx_data = ctx_data;
+
+   return gfx_ctx;
 }
 
 #ifdef GL_DEBUG
@@ -1726,6 +1733,7 @@ static void *gl_init(const video_info_t *video,
 
    video_context_driver_set((const gfx_ctx_driver_t*)ctx_driver);
 
+   gl->ctx_driver                       = ctx_driver;
    gl->video_info                       = *video;
 
    RARCH_LOG("[GL]: Found GL context: %s\n", ctx_driver->ident);
@@ -1782,18 +1790,10 @@ static void *gl_init(const video_info_t *video,
 
    if (hwr->context_type == RETRO_HW_CONTEXT_OPENGL_CORE)
    {
-      gfx_ctx_flags_t flags;
-
       gl_query_core_context_set(true);
       gl->core_context_in_use = true;
 
-      /**
-       * Ensure that the rest of the frontend knows we have a core context
-       */
-      flags.flags = 0;
-      BIT32_SET(flags.flags, GFX_CTX_FLAGS_GL_CORE_CONTEXT);
-
-      video_context_driver_set_flags(&flags);
+      gl_set_core_context(hwr->context_type);
 
       RARCH_LOG("[GL]: Using Core GL context, setting up VAO...\n");
       if (!gl_check_capability(GL_CAPS_VAO))
@@ -2019,31 +2019,26 @@ error:
 
 static bool gl_alive(void *data)
 {
-   gfx_ctx_size_t size_data;
    unsigned temp_width  = 0;
    unsigned temp_height = 0;
    bool ret             = false;
    bool quit            = false;
    bool resize          = false;
    gl_t         *gl     = (gl_t*)data;
+   bool is_shutdown     = rarch_ctl(RARCH_CTL_IS_SHUTDOWN, NULL);
 
    /* Needed because some context drivers don't track their sizes */
    video_driver_get_size(&temp_width, &temp_height);
 
-   size_data.quit       = &quit;
-   size_data.resize     = &resize;
-   size_data.width      = &temp_width;
-   size_data.height     = &temp_height;
+   gl->ctx_driver->check_window(gl->ctx_data,
+         &quit, &resize, &temp_width, &temp_height, is_shutdown);
 
-   if (video_context_driver_check_window(&size_data))
-   {
-      if (quit)
-         gl->quitting = true;
-      else if (resize)
-         gl->should_resize = true;
+   if (quit)
+      gl->quitting = true;
+   else if (resize)
+      gl->should_resize = true;
 
-      ret = !gl->quitting;
-   }
+   ret = !gl->quitting;
 
    if (temp_width != 0 && temp_height != 0)
       video_driver_set_size(&temp_width, &temp_height);

@@ -181,9 +181,7 @@ ACHIEVEMENTS
 /*============================================================
 MD5
 ============================================================ */
-#if defined(HAVE_CHEEVOS) || (defined(HAVE_HTTPSERVER) && defined(HAVE_ZLIB))
 #include "../libretro-common/utils/md5.c"
-#endif
 
 /*============================================================
 CHEATS
@@ -1037,6 +1035,7 @@ RETROARCH
 #include "../intl/msg_hash_chs.c"
 #include "../intl/msg_hash_cht.c"
 #include "../intl/msg_hash_ar.c"
+#include "../intl/msg_hash_el.c"
 #endif
 
 #include "../intl/msg_hash_us.c"

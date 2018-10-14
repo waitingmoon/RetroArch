@@ -477,12 +477,14 @@ int generic_action_ok_displaylist_push(const char *path,
          dl_type            = DISPLAYLIST_FILE_BROWSER_SELECT_FILE;
          break;
       case ACTION_OK_DL_STREAM_CONFIGFILE:
-         filebrowser_clear_type();
-         info.type          = type;
-         info.directory_ptr = idx;
-         info_path          = settings->paths.path_stream_config;
-         info_label         = label;
-         dl_type            = DISPLAYLIST_FILE_BROWSER_SELECT_FILE;
+         {
+            global_t  *global  = global_get_ptr();
+            info.type          = type;
+            info.directory_ptr = idx;
+            info_path          = global->record.config_dir;
+            info_label         = label;
+            dl_type            = DISPLAYLIST_FILE_BROWSER_SELECT_FILE;
+         }
          break;
       case ACTION_OK_DL_RECORD_CONFIGFILE:
          filebrowser_clear_type();
@@ -1302,20 +1304,22 @@ static int generic_action_ok(const char *path,
          break;
       case ACTION_OK_LOAD_STREAM_CONFIGFILE:
          {
-            settings_t *settings            = config_get_ptr();
+            settings_t *settings = config_get_ptr();
             flush_char       = msg_hash_to_str(flush_id);
-            strlcpy(settings->paths.path_stream_config, action_path,
-                  sizeof(settings->paths.path_stream_config));
+
+            if (settings)
+               strlcpy(settings->paths.path_stream_config, action_path,
+                     sizeof(settings->paths.path_stream_config));
          }
          break;
       case ACTION_OK_LOAD_RECORD_CONFIGFILE:
          {
-            global_t *global = global_get_ptr();
+            settings_t *settings = config_get_ptr();
             flush_char       = msg_hash_to_str(flush_id);
 
-            if (global)
-               strlcpy(global->record.config, action_path,
-                     sizeof(global->record.config));
+            if (settings)
+               strlcpy(settings->paths.path_record_config, action_path,
+                     sizeof(settings->paths.path_record_config));
          }
          break;
       case ACTION_OK_LOAD_REMAPPING_FILE:
@@ -3929,6 +3933,7 @@ void netplay_refresh_rooms_menu(file_list_t *list)
 {
    char s[8300];
    int i                                = 0;
+   int room_type                        = 0;
 
    s[0]                                 = '\0';
 
@@ -4008,14 +4013,16 @@ void netplay_refresh_rooms_menu(file_list_t *list)
          snprintf(s, sizeof(s), "%s: %s%s",
             netplay_room_list[i].lan ? "Local" :
             (netplay_room_list[i].host_method == NETPLAY_HOST_METHOD_MITM ?
-            "Internet (relay)" : "Internet (direct)"),
+            "Internet (Relay)" : "Internet"),
             netplay_room_list[i].nickname, country);
+
+         room_type = netplay_room_list[i].lan ? MENU_ROOM_LAN : (netplay_room_list[i].host_method == NETPLAY_HOST_METHOD_MITM ? MENU_ROOM_RELAY : MENU_ROOM);
 
          menu_entries_append_enum(list,
                s,
                msg_hash_to_str(MENU_ENUM_LABEL_CONNECT_NETPLAY_ROOM),
                MENU_ENUM_LABEL_CONNECT_NETPLAY_ROOM,
-               MENU_SETTINGS_NETPLAY_ROOMS_START + i, 0, 0);
+               room_type, 0, 0);
       }
 
       netplay_rooms_free();
@@ -5284,6 +5291,9 @@ static int menu_cbs_init_bind_ok_compare_label(menu_file_list_cbs_t *cbs,
             break;
          case MENU_LABEL_RECORD_CONFIG:
             BIND_ACTION_OK(cbs, action_ok_record_configfile);
+            break;
+         case MENU_LABEL_STREAM_CONFIG:
+            BIND_ACTION_OK(cbs, action_ok_stream_configfile);
             break;
 #ifdef HAVE_NETWORKING
          case MENU_LABEL_UPDATE_LAKKA:
